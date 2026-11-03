@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Busque tempos de arrancada por piloto, carro ou modelo em todos os eventos publicados pela Produpark.">
+<title>Busca de Tempos de Arrancada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: faixa de cabeçalho + painel de filtros + resumo do piloto em formato "time slip" + tabela rolável */
+:root {
+  --bg: #F1F2F4; --surface: #FFFFFF; --ink: #16181D; --muted: #5B6170; --line: #D9DCE2; --alt: #F7F8FA;
+  --accent: #9A6408; --accent-fill: #F2B11B; --on-accent: #1A1406; --burn: #B83227; --burn-bg: #FBEAE8; --good: #1B7A4B;
+  --slip: #FFFDF6; --head: #1C1F25; --on-head: #F4F5F7;
+  --f-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111317; --surface: #191C21; --ink: #E8EAEE; --muted: #9AA0AC; --line: #2B2F37; --alt: #1D2026;
+  --accent: #F2B11B; --accent-fill: #F2B11B; --on-accent: #1A1406; --burn: #F07467; --burn-bg: #3A1E1C; --good: #52C68E;
+  --slip: #1F2127; --head: #0B0C0F; --on-head: #F4F5F7; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111317; --surface: #191C21; --ink: #E8EAEE; --muted: #9AA0AC; --line: #2B2F37; --alt: #1D2026;
+  --accent: #F2B11B; --accent-fill: #F2B11B; --on-accent: #1A1406; --burn: #F07467; --burn-bg: #3A1E1C; --good: #52C68E;
+  --slip: #1F2127; --head: #0B0C0F; --on-head: #F4F5F7; color-scheme: dark }
+
+*, *::before, *::after { box-sizing: border-box }
+[hidden] { display: none !important }
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px) }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.45 }
+.wrap { max-width: 1400px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+header { background: var(--head); color: var(--on-head) }
+header .wrap { padding-block: 20px 18px; display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 32px }
+.tree { display: flex; gap: 5px; margin-bottom: 8px }
+.tree i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-fill); opacity: .35 }
+.tree i:nth-child(3) { opacity: 1 } .tree i:nth-child(4) { background: #3DBB6F; opacity: 1 }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: 34px; line-height: 1; margin: 0; letter-spacing: .01em; text-transform: uppercase; text-wrap: balance }
+.sub { margin: 6px 0 0; color: #AEB4BF; font-size: 13px; max-width: 62ch }
+.sub a { color: var(--accent-fill) }
+.stats { display: flex; gap: 24px; flex-wrap: wrap }
+.stat b { display: block; font-family: var(--f-mono); font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums }
+.stat span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #AEB4BF }
+
+.filters { background: var(--surface); border-bottom: 1px solid var(--line) }
+.filters .wrap { padding-block: 14px; display: grid; grid-template-columns: minmax(220px, 2.2fr) repeat(5, minmax(120px, 1fr)); gap: 10px 12px; align-items: end }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0 }
+.field label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted) }
+input[type=search], select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; width: 100% }
+input[type=search] { font-size: 15px }
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent-fill); outline-offset: 1px }
+.row2 { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center }
+.check { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; font-size: 13px }
+.check input { accent-color: var(--accent-fill); width: 16px; height: 16px }
+.btn { font: inherit; font-size: 13px; font-weight: 500; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 6px 12px; cursor: pointer }
+.btn:hover { border-color: var(--muted) }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-fill); color: var(--on-accent); border: 0; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer }
+.chip.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); font-weight: 500 }
+.chip.ghost:hover { border-color: var(--accent-fill) }
+
+main .wrap { padding-block: 16px 40px; display: flex; flex-direction: column; gap: 14px }
+.status { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; color: var(--muted) }
+.status strong { color: var(--ink); font-family: var(--f-mono); font-weight: 500 }
+.suggest { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+.suggest > span { font-size: 12px; color: var(--muted); margin-right: 4px }
+
+.slip { background: var(--slip); border: 1px dashed var(--line); border-radius: 4px; padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px 32px; font-family: var(--f-mono) }
+.slip h2 { font-family: var(--f-display); font-weight: 700; font-size: 26px; margin: 0; text-transform: uppercase; line-height: 1.05; text-wrap: balance }
+.slip .meta { color: var(--muted); font-size: 12px; margin-top: 6px }
+.slip dl { margin: 0; display: grid; gap: 4px }
+.slip dl div { display: flex; gap: 8px; align-items: baseline; font-size: 13px }
+.slip dt { white-space: nowrap }
+.slip dt::after { content: ""; flex: 1 }
+.slip .lead { flex: 1; border-bottom: 1px dotted var(--muted); transform: translateY(-4px); min-width: 12px }
+.slip dd { margin: 0; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap }
+.slip dd small { color: var(--muted); font-weight: 400; margin-left: 6px; white-space: normal }
+
+.tablebox { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto }
+table { border-collapse: collapse; width: 100%; font-size: 13px }
+th { position: sticky; top: 0; background: var(--surface); text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; cursor: pointer; user-select: none }
+th.num { text-align: right }
+th[aria-sort] { color: var(--ink) }
+th[aria-sort="ascending"]::after { content: " ▲"; color: var(--accent) }
+th[aria-sort="descending"]::after { content: " ▼"; color: var(--accent) }
+td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top }
+tbody tr:nth-child(even) { background: var(--alt) }
+td.num { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap }
+td.et { font-weight: 600 }
+td.data { white-space: nowrap; font-family: var(--f-mono); font-size: 12px; color: var(--muted) }
+td.ev { min-width: 200px; max-width: 320px }
+td.cat { min-width: 140px; max-width: 220px; font-size: 12px }
+td.nome { min-width: 160px; font-weight: 500 }
+td .sess { display: block; font-size: 11px; color: var(--muted) }
+.lk { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px }
+.lk:hover { text-decoration-color: var(--accent-fill) }
+.ext { color: var(--muted); text-decoration: none; margin-left: 4px; font-size: 12px }
+.ext:hover { color: var(--accent) }
+.tag { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap }
+.tag.m { border-color: var(--accent-fill); color: var(--accent) }
+tr.burn td { color: var(--muted) }
+.q { display: inline-block; font-family: var(--f-body); font-size: 10px; font-weight: 700; color: var(--burn); background: var(--burn-bg); border-radius: 3px; padding: 0 5px; margin-right: 5px }
+.more { align-self: center }
+.empty { padding: 40px 16px; text-align: center; color: var(--muted) }
+footer { color: var(--muted); font-size: 12px }
+
+@media (max-width: 1000px) { .filters .wrap { grid-template-columns: repeat(3, minmax(0, 1fr)) } .filters .field.q { grid-column: 1 / -1 } }
+@media (max-width: 640px) {
+  .filters .wrap { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .slip { grid-template-columns: 1fr }
+  h1 { font-size: 28px }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div>
+      <div class="tree" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <h1>Busca de Tempos de Arrancada</h1>
+      <p class="sub">Todas as passadas publicadas em <a href="http://www.produpark.com.br/temposOnline" target="_blank" rel="noopener">produpark.com.br</a>, reunidas em uma única tabela. Página não oficial; dados coletados em 03/11/2026.</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+</header>
+
+<section class="filters" aria-label="Filtros">
+  <div class="wrap">
+    <div class="field q"><label for="q">Piloto, nº do carro ou modelo</label>
+      <input type="search" id="q" placeholder="Ex.: Scariot, 2007, Opala" autocomplete="off"></div>
+    <div class="field"><label for="ano">Ano</label><select id="ano"></select></div>
+    <div class="field"><label for="evento">Evento</label><select id="evento"></select></div>
+    <div class="field"><label for="cat">Categoria</label><select id="cat"></select></div>
+    <div class="field"><label for="fase">Fase</label>
+      <select id="fase"><option value="">Todas</option><option value="0">Treino</option><option value="1">Classificação</option><option value="2">Mata-mata</option></select></div>
+    <div class="field"><label for="modo">Mostrar</label>
+      <select id="modo"><option value="">Todas as passadas</option><option value="pe">Melhor de cada piloto por evento</option><option value="p">Melhor de cada piloto (geral)</option></select></div>
+    <div class="row2">
+      <label class="check"><input type="checkbox" id="semQueima"> Esconder queimadas e passadas sem tempo final</label>
+      <span id="pilotChip"></span>
+      <button class="btn" id="limpar" type="button">Limpar filtros</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="wrap">
+    <div class="status" id="status">Carregando dados…</div>
+    <div class="suggest" id="suggest" hidden></div>
+    <section class="slip" id="slip" hidden aria-label="Resumo do piloto"></section>
+    <div class="tablebox"><table>
+      <thead><tr id="thead"></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table><div class="empty" id="empty" hidden>Nenhuma passada encontrada com esses filtros.</div></div>
+    <button class="btn more" id="more" type="button" hidden>Mostrar mais</button>
+    <footer>Tempos em segundos. <b>Pista</b> = tempo do carro na pista (sem a reação). <b>Pista+R</b> = tempo oficial somando a reação. Passadas idênticas listadas em várias páginas do site aparecem uma vez só. Tempos extraoficiais, sujeitos a desclassificação. Encontrou um erro ou quer retirar seu nome? <a href="https://github.com/RodrigoBrandao-Git/arrancadas/issues" target="_blank" rel="noopener" style="color: var(--accent)">Abra um pedido aqui</a>.</footer>
+  </div>
+</main>
+
+<script src="dados.js"></script>
+<script>
+(function () {
+  const D = window.DADOS;
+  const $ = id => document.getElementById(id);
+  if (!D) { $("status").textContent = "Não foi possível carregar os dados. Recarregue a página."; return; }
+  // índices das colunas em cada linha
+  const E = 0, S = 1, T = 2, C = 3, N = 4, P = 5, M = 6, Q = 7, RE = 8, F60 = 9, M100 = 10, M201 = 11, M402 = 12, PI = 13, TO = 14, V = 15, H = 16;
+  const rows = D.rows, dic = D.dic, ev = D.ev;
+  const FASE = ["Treino", "Classificação", "Mata-mata"];
+  const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const evData = id => ev[id][0], evNome = id => dic.evento[ev[id][1]];
+  const fmtT = ms => ms ? (ms / 1000).toFixed(3).replace(".", ",") : "—";
+  const fmtD = d => d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4) : "";
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  // texto pesquisável por linha (piloto, carro, modelo)
+  const nomeN = dic.nome.map(norm), modN = dic.modelo.map(norm);
+  const hay = rows.map(r => nomeN[r[P]] + " | " + modN[r[M]] + " | #" + r[N].replace(/^0+/, ""));
+
+  // cabeçalho com totais
+  const pilotos = new Set(rows.map(r => r[P])).size;
+  const datas = Object.values(ev).map(e => e[0]).filter(Boolean).sort();
+  $("stats").innerHTML = [[rows.length.toLocaleString("pt-BR"), "passadas"], [pilotos.toLocaleString("pt-BR"), "pilotos"],
+    [Object.keys(ev).length, "eventos"], [datas[0].slice(0, 4) + "–" + datas[datas.length - 1].slice(0, 4), "período"]]
+    .map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+
+  // listas dos filtros
+  const anos = [...new Set(datas.map(d => d.slice(0, 4)))].sort().reverse();
+  $("ano").innerHTML = `<option value="">Todos</option>` + anos.map(a => `<option>${a}</option>`).join("");
+  function fillEventos() {
+    const a = $("ano").value, cur = $("evento").value;
+    const ids = Object.keys(ev).filter(id => !a || evData(id).startsWith(a)).sort((x, y) => evData(y).localeCompare(evData(x)));
+    $("evento").innerHTML = `<option value="">Todos</option>` + ids.map(id => `<option value="${id}">${fmtD(evData(id))} · ${esc(evNome(id))}</option>`).join("");
+    if (ids.includes(cur)) $("evento").value = cur;
+  }
+  function fillCats() {
+    const a = $("ano").value, e = $("evento").value, cur = $("cat").value, cnt = new Map();
+    for (const r of rows) {
+      if (e && r[E] != e) continue;
+      if (a && !evData(r[E]).startsWith(a)) continue;
+      cnt.set(r[C], (cnt.get(r[C]) || 0) + 1);
+    }
+    const cats = [...cnt.keys()].filter(c => dic.cat[c]).sort((x, y) => dic.cat[x].localeCompare(dic.cat[y]));
+    $("cat").innerHTML = `<option value="">Todas</option>` + cats.map(c => `<option value="${c}">${esc(dic.cat[c])} (${cnt.get(c)})</option>`).join("");
+    if (cats.includes(+cur)) $("cat").value = cur;
+  }
+
+  const st = { pilot: null, sort: [{ k: "data", dir: -1 }, { k: "pista", dir: 1 }], limit: 150 };
+  const COLS = [
+    { k: "data", t: "Data", cls: "data", v: r => evData(r[E]) },
+    { k: "evento", t: "Evento / sessão", cls: "ev", v: r => evNome(r[E]) },
+    { k: "cat", t: "Categoria", cls: "cat", v: r => dic.cat[r[C]] },
+    { k: "carro", t: "Nº", cls: "num", v: r => parseInt(r[N]) || 0 },
+    { k: "nome", t: "Piloto", cls: "nome", v: r => dic.nome[r[P]] },
+    { k: "modelo", t: "Modelo", cls: "", v: r => dic.modelo[r[M]] },
+    { k: "reacao", t: "Reação", cls: "num", i: RE },
+    { k: "p60", t: "60 pés", cls: "num", i: F60 },
+    { k: "m100", t: "100m", cls: "num", i: M100 },
+    { k: "m201", t: "201m", cls: "num", i: M201 },
+    { k: "m402", t: "402m", cls: "num", i: M402 },
+    { k: "pista", t: "Pista", cls: "num et", i: PI },
+    { k: "total", t: "Pista+R", cls: "num", i: TO },
+    { k: "vel", t: "Vel. km/h", cls: "num", i: V },
+  ];
+  const colBy = Object.fromEntries(COLS.map(c => [c.k, c]));
+  const val = (c, r) => c.v ? c.v(r) : (r[c.i] || null);
+
+  function filtrar() {
+    const toks = norm($("q").value.trim()).split(/\s+/).filter(Boolean).map(t => /^\d+$/.test(t) ? null : t);
+    const nums = norm($("q").value.trim()).split(/\s+/).filter(t => /^\d+$/.test(t)).map(t => t.replace(/^0+/, ""));
+    const a = $("ano").value, e = $("evento").value, c = $("cat").value, f = $("fase").value, sq = $("semQueima").checked;
+    const out = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (st.pilot !== null && r[P] !== st.pilot) continue;
+      if (e && r[E] != e) continue;
+      if (a && !evData(r[E]).startsWith(a)) continue;
+      if (c && r[C] != c) continue;
+      if (f && r[T] != f) continue;
+      if (sq && (r[Q] || !r[PI])) continue;
+      let ok = true;
+      for (const t of toks) if (t && !hay[i].includes(t)) { ok = false; break; }
+      if (ok) for (const n of nums) if (!hay[i].endsWith("#" + n)) { ok = false; break; }
+      if (ok) out.push(r);
+    }
+    return out;
+  }
+
+  function agrupar(list, modo) {
+    if (!modo) return list;
+    const best = new Map();
+    for (const r of list) {
+      if (r[Q] || !r[PI]) continue;
+      const k = modo === "p" ? r[P] : r[P] + "|" + r[E];
+      const b = best.get(k);
+      if (!b || r[PI] < b[PI]) best.set(k, r);
+    }
+    return [...best.values()];
+  }
+
+  function ordenar(list) {
+    const keys = st.sort.map(s => ({ c: colBy[s.k], dir: s.dir }));
+    return list.sort((x, y) => {
+      for (const { c, dir } of keys) {
+        let a = val(c, x), b = val(c, y);
+        if (a === b) continue;
+        if (a === null || a === "") return 1;
+        if (b === null || b === "") return -1;
+        return (typeof a === "string" ? a.localeCompare(b) : a - b) * dir;
+      }
+      return 0;
+    });
+  }
+
+  function resumo(list) {
+    const slip = $("slip"), sug = $("suggest");
+    const nomes = new Map();
+    for (const r of list) nomes.set(r[P], (nomes.get(r[P]) || 0) + 1);
+    slip.hidden = true; sug.hidden = true;
+    if (nomes.size === 1) {
+      const pid = list[0][P], ok = list.filter(r => !r[Q] && r[PI]);
+      const min = i => ok.filter(r => r[i] > 0).reduce((b, r) => !b || r[i] < b[i] ? r : b, null);
+      const max = i => list.filter(r => r[i] > 0).reduce((b, r) => !b || r[i] > b[i] ? r : b, null);
+      const evs = new Set(list.map(r => r[E])), carros = [...new Set(list.map(r => r[N]))].slice(0, 6);
+      const ond = r => r ? `<small>${fmtD(evData(r[E]))} · ${esc(evNome(r[E]))}</small>` : "";
+      const linha = (k, r, i, f) => `<div><dt>${k}</dt><span class="lead"></span><dd>${r ? f(r[i]) : "—"}${ond(r)}</dd></div>`;
+      const datasP = [...evs].map(evData).sort();
+      slip.innerHTML = `<div><h2>${esc(dic.nome[pid])}</h2>
+        <div class="meta">Carro nº ${carros.map(esc).join(", ")} · ${[...new Set(list.map(r => dic.modelo[r[M]]).filter(Boolean))].slice(0, 4).map(esc).join(", ")}</div>
+        <div class="meta">${list.length} passadas em ${evs.size} evento${evs.size > 1 ? "s" : ""} · ${fmtD(datasP[0])} a ${fmtD(datasP[datasP.length - 1])}</div></div>
+        <dl>${linha("ET (pista)", min(PI), PI, fmtT)}${linha("R/T (reação)", min(RE), RE, fmtT)}${linha("60'", min(F60), F60, fmtT)}${linha("Pista+R", min(TO), TO, fmtT)}${linha("Vel. máx", max(V), V, v => v + " km/h")}</dl>`;
+      slip.hidden = false;
+    } else if (nomes.size > 1 && $("q").value.trim() && st.pilot === null) {
+      const top = [...nomes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14);
+      sug.innerHTML = `<span>Pilotos encontrados:</span>` + top.map(([p, n]) => `<button class="chip ghost" type="button" data-p="${p}">${esc(dic.nome[p])} · ${n}</button>`).join("");
+      sug.hidden = false;
+    }
+  }
+
+  function render() {
+    const modo = $("modo").value;
+    const base = filtrar();
+    const list = ordenar(agrupar(base, modo));
+    resumo(base);
+    const show402 = list.some(r => r[M402]);
+    const cols = COLS.filter(c => c.k !== "m402" || show402);
+    $("thead").innerHTML = cols.map(c => {
+      const s = st.sort[0].k === c.k ? (st.sort[0].dir > 0 ? "ascending" : "descending") : null;
+      return `<th class="${c.cls.includes("num") ? "num" : ""}" data-k="${c.k}" ${s ? `aria-sort="${s}"` : ""} scope="col">${c.t}</th>`;
+    }).join("");
+    const page = list.slice(0, st.limit);
+    $("tbody").innerHTML = page.map(r => {
+      const tds = cols.map(c => {
+        if (c.k === "data") return `<td class="data">${fmtD(evData(r[E]))}</td>`;
+        if (c.k === "evento") return `<td class="ev"><button class="lk" data-e="${r[E]}" type="button">${esc(evNome(r[E]))}</button><a class="ext" href="http://www.produpark.com.br/temposOnline/${r[E]}" target="_blank" rel="noopener" title="Abrir no site original">↗</a><span class="sess"><span class="tag ${r[T] === 2 ? "m" : ""}">${FASE[r[T]]}</span> ${esc(dic.sessao[r[S]])}${r[H] ? " · " + r[H] : ""}</span></td>`;
+        if (c.k === "cat") return `<td class="cat">${esc(dic.cat[r[C]])}</td>`;
+        if (c.k === "carro") return `<td class="num">${esc(r[N])}</td>`;
+        if (c.k === "nome") return `<td class="nome"><button class="lk" data-p="${r[P]}" type="button">${esc(dic.nome[r[P]])}</button></td>`;
+        if (c.k === "modelo") return `<td>${esc(dic.modelo[r[M]])}</td>`;
+        if (c.k === "reacao") return `<td class="num">${r[Q] ? '<span class="q">QUEIMOU</span>' : ""}${fmtT(r[RE])}</td>`;
+        if (c.k === "vel") return `<td class="num">${r[V] || "—"}</td>`;
+        return `<td class="${c.cls}">${fmtT(r[c.i])}</td>`;
+      }).join("");
+      return `<tr class="${r[Q] ? "burn" : ""}">${tds}</tr>`;
+    }).join("");
+    $("empty").hidden = list.length > 0;
+    $("more").hidden = list.length <= st.limit;
+    $("more").textContent = `Mostrar mais (${(list.length - st.limit).toLocaleString("pt-BR")} restantes)`;
+    const pil = new Set(list.map(r => r[P])).size, evs = new Set(list.map(r => r[E])).size;
+    $("status").innerHTML = `<span><strong>${list.length.toLocaleString("pt-BR")}</strong> ${modo ? "melhores passadas" : "passadas"}</span><span><strong>${pil.toLocaleString("pt-BR")}</strong> pilotos</span><span><strong>${evs}</strong> eventos</span>` +
+      (list.length > st.limit ? `<span>mostrando as primeiras ${st.limit.toLocaleString("pt-BR")}</span>` : "");
+    $("pilotChip").innerHTML = st.pilot !== null ? `<button class="chip" type="button" id="unpilot" title="Remover filtro de piloto">Piloto: ${esc(dic.nome[st.pilot])} ✕</button>` : "";
+  }
+
+  let tmr;
+  const go = () => { st.limit = 150; render(); };
+  $("q").addEventListener("input", () => { clearTimeout(tmr); tmr = setTimeout(go, 200); });
+  $("ano").addEventListener("change", () => { fillEventos(); fillCats(); go(); });
+  $("evento").addEventListener("change", () => { fillCats(); go(); });
+  for (const id of ["cat", "fase", "modo", "semQueima"]) $(id).addEventListener("change", go);
+  $("more").addEventListener("click", () => { st.limit += 300; render(); });
+  $("limpar").addEventListener("click", () => {
+    $("q").value = ""; $("ano").value = ""; $("fase").value = ""; $("modo").value = ""; $("semQueima").checked = false;
+    st.pilot = null; fillEventos(); $("evento").value = ""; fillCats(); $("cat").value = ""; go();
+  });
+  document.addEventListener("click", ev2 => {
+    const b = ev2.target.closest("[data-p],[data-e],#unpilot,th[data-k]");
+    if (!b) return;
+    if (b.id === "unpilot") { st.pilot = null; go(); return; }
+    if (b.matches("th[data-k]")) {
+      const k = b.dataset.k, cur = st.sort[0];
+      const dir = cur.k === k ? -cur.dir : (k === "data" || k === "vel" ? -1 : 1);
+      st.sort = k === "pista" ? [{ k, dir }] : [{ k, dir }, { k: "pista", dir: 1 }];
+      render(); return;
+    }
+    if (b.dataset.p !== undefined) { st.pilot = +b.dataset.p; $("q").value = ""; go(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    else if (b.dataset.e !== undefined) { $("ano").value = ""; fillEventos(); $("evento").value = b.dataset.e; fillCats(); go(); }
+  });
+
+  fillEventos(); fillCats(); render();
+})();
+</script>
+</body>
+</html>
